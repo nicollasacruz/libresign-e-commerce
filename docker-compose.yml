@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - ./volumes/libresign-e-commerce:/var/www/html
+    depends_on:
+      - php
+    networks:
+      - libresign-e-commerce
+
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    volumes:
+      - ./volumes/libresign-e-commerce:/var/www/html
+    networks:
+      - libresign-e-commerce
+
+  db:
+    image: mariadb
+    environment:
+      - TZ=${TZ:-CET}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-libresign}
+      - MYSQL_USER=${MYSQL_USER:-libresign}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-libresign}
+    volumes:
+      - ./.docker/config/mysql:/etc/mysql/conf.d
+      - ./volumes/mysql/dump:/docker-entrypoint-initdb.d
+      - ./volumes/mysql/data:/var/lib/mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    networks:
+      - libresign-e-commerce
+    
+  pgsql:
+    image: postgres:13-alpine
+    restart: unless-stopped
+    volumes:
+      - ./volumes/postgres/data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-sonarqube}
+      - POSTGRES_USER=${POSTGRES_USER:-sonarqube}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sonarqube}
+    ports:
+      - 127.0.0.1:5432:5432
+    command: postgres -c log_statement=all
+    networks:
+      - libresign-e-commerce
+
+  mailhog:
+    image: blueimp/mailhog
+    ports:
+      - 8025:8025
+      - 1025:1025
+    networks:
+      - libresign-e-commerce
+
+  # sonarqube:
+  #   image: sonarqube:latest
+  #   ports:
+  #     - "9000:9000"
+  #     - "9092:9092"  # Porta para comunicação com scanners de análise
+  #   environment:
+  #     - SONARQUBE_JDBC_URL=jdbc:postgresql://pgsql:5432/sonarqube
+  #     - SONARQUBE_JDBC_USERNAME=sonarqube
+  #     - SONARQUBE_JDBC_PASSWORD=sonarqube
+  #   depends_on:
+  #     - pgsql
+  #   networks:
+  #     - libresign-e-commerce
+
+networks:
+  libresign-e-commerce:
